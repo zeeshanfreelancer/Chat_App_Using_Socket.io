@@ -11,6 +11,7 @@ const ChatContainer = ({ user, socket, onLogout }) => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [activeChat, setActiveChat] = useState(null); // For private chat
   const [privateMessages, setPrivateMessages] = useState({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Join socket
@@ -19,6 +20,14 @@ const ChatContainer = ({ user, socket, onLogout }) => {
       socket.emit("joinUser", user.username);
     }
   }, [user, socket]);
+
+  // Auto scroll to last message
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
 
   // Socket listeners
   useEffect(() => {
@@ -81,61 +90,79 @@ const ChatContainer = ({ user, socket, onLogout }) => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
-      <div className="w-full max-w-md bg-white shadow-xl rounded-2xl overflow-hidden flex flex-col h-[90vh] max-h-[700px] relative">
+    <div className="flex h-screen bg-gradient-to-br from-indigo-50 to-purple-50 overflow-hidden">
+      {/* Sidebar */}
+      <div className={`bg-white shadow-xl transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-64' : 'w-0'} overflow-hidden`}>
+        <div className="p-4 font-bold text-lg border-b">Online Users</div>
+        <div className="p-2 overflow-y-auto h-[calc(100vh-4rem)]">
+          {onlineUsers.filter(u => u !== user.username).map((user) => (
+            <div
+              key={user}
+              onClick={() => {
+                setActiveChat(user);
+                setSidebarOpen(false);
+              }}
+              className="p-3 cursor-pointer hover:bg-indigo-100 rounded-lg flex items-center"
+            >
+              <span className="text-green-500 mr-2">●</span>
+              {user}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col h-screen">
+        <Header user={user} onLogout={onLogout} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
         
-        {/* Sidebar Toggle */}
-        <SidebarToggle
-          socket={socket}
-          onlineUsers={onlineUsers}
-          activeChat={activeChat}
-          setActiveChat={setActiveChat}
-          currentUser={user.username}
-        />
+        <div className="flex flex-1 overflow-hidden">
+          {/* Public Chat */}
+          <div className={`flex-1 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
+            <MessageList
+              messages={messages}
+              currentUser={user}
+              typingUser={typingUser}
+              messagesEndRef={messagesEndRef}
+              onEditMessage={(msg) => {
+                const newText = prompt("Edit message:", msg.text);
+                if (newText && newText !== msg.text) socket.emit("editMessage", { id: msg.id, newText });
+              }}
+              onDeleteMessage={(id) => socket.emit("deleteMessage", id)}
+              onSendReaction={(index, reaction) => socket.emit("reactMessage", { index, reaction })}
+            />
+            <MessageInput
+              socket={socket}
+              currentUser={user}
+              onSendMessage={(messageText) => {
+                if (messageText.trim() && user) {
+                  const msg = {
+                    id: Date.now(),
+                    user: user.username,
+                    text: messageText,
+                    profilePic: user.profilePic,
+                    bio: user.bio,
+                    time: new Date().toLocaleTimeString(),
+                  };
+                  socket.emit("chatMessage", msg);
+                  socket.emit("stopTyping", user.username);
+                  return true;
+                }
+                return false;
+              }}
+            />
+          </div>
 
-        {/* Main Chat UI */}
-        <Header user={user} onLogout={onLogout} />
-
-        <MessageList
-          messages={messages}
-          currentUser={user}
-          typingUser={typingUser}
-          messagesEndRef={messagesEndRef}
-          onEditMessage={(msg) => {
-            const newText = prompt("Edit message:", msg.text);
-            if (newText && newText !== msg.text) socket.emit("editMessage", { id: msg.id, newText });
-          }}
-          onDeleteMessage={(id) => socket.emit("deleteMessage", id)}
-          onSendReaction={(index, reaction) => socket.emit("reactMessage", { index, reaction })}
-        />
-
-        <PrivateChatWindow
-          activeChat={activeChat}
-          privateMessages={privateMessages}
-          sendPrivateMessage={sendPrivateMessage}
-          currentUser={user.username}
-        />
-
-        <MessageInput
-          socket={socket}
-          currentUser={user}
-          onSendMessage={(messageText) => {
-            if (messageText.trim() && user) {
-              const msg = {
-                id: Date.now(),
-                user: user.username,
-                text: messageText,
-                profilePic: user.profilePic,
-                bio: user.bio,
-                time: new Date().toLocaleTimeString(),
-              };
-              socket.emit("chatMessage", msg);
-              socket.emit("stopTyping", user.username);
-              return true;
-            }
-            return false;
-          }}
-        />
+          {/* Private Chat */}
+          <div className={`flex-1 flex flex-col ${activeChat ? 'flex' : 'hidden md:flex'} border-l border-gray-200`}>
+            <PrivateChatWindow
+              activeChat={activeChat}
+              privateMessages={privateMessages}
+              sendPrivateMessage={sendPrivateMessage}
+              currentUser={user.username}
+              onClose={() => setActiveChat(null)}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -11,33 +11,35 @@ const MessageList = ({
   onSendReaction,
 }) => {
   return (
-    <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-white to-indigo-50">
-      {messages.map((msg, i) => (
-        <Message
-          key={msg.id}
-          message={msg}
-          index={i}
-          isOwnMessage={msg.user === currentUser.username}
-          onEditMessage={onEditMessage}
-          onDeleteMessage={onDeleteMessage}
-          onSendReaction={onSendReaction}
-        />
-      ))}
+    <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-white to-indigo-50">
+      <div className="max-w-4xl mx-auto">
+        {messages.map((msg, i) => (
+          <Message
+            key={msg.id}
+            message={msg}
+            index={i}
+            isOwnMessage={msg.user === currentUser.username}
+            onEditMessage={onEditMessage}
+            onDeleteMessage={onDeleteMessage}
+            onSendReaction={onSendReaction}
+          />
+        ))}
 
-      {/* Typing Indicator */}
-      {typingUser && (
-        <div className="flex items-center text-sm text-gray-500 italic mb-2">
-          <div className="typing-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+        {/* Typing Indicator */}
+        {typingUser && (
+          <div className="flex items-center text-sm text-gray-500 italic mb-4 ml-4">
+            <div className="typing-dots flex space-x-1 mr-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+            </div>
+            {typingUser} is typing...
           </div>
-          {typingUser} is typing...
-        </div>
-      )}
+        )}
 
-      {/* Scroll anchor */}
-      <div ref={messagesEndRef} />
+        {/* Scroll anchor */}
+        <div ref={messagesEndRef} />
+      </div>
     </div>
   );
 };
