@@ -20,6 +20,31 @@ const ChatContainer = ({ user, socket, onLogout }) => {
     }
   }, [user, socket]);
 
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/messages/public");
+        const data = await res.json();
+
+        // Transform messages to ensure user is a string for older messages
+        const transformed = data.map(msg => ({
+          ...msg,
+          user: msg.user?.username || msg.user,
+          profilePic: msg.user?.profilePic,
+          bio: msg.user?.bio,
+        }));
+
+        setMessages(transformed);
+      } catch (error) {
+        console.error("❌ Failed to load messages", error);
+      }
+    };
+
+    fetchMessages();
+  }, []);
+
+
+
   // Auto scroll to last message
   useEffect(() => {
     if (messagesEndRef.current) {

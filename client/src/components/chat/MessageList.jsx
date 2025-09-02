@@ -1,4 +1,3 @@
-// components/MessageList.jsx
 import Message from "./Message";
 
 const MessageList = ({
@@ -15,10 +14,14 @@ const MessageList = ({
       <div className="max-w-4xl mx-auto">
         {messages.map((msg, i) => (
           <Message
-            key={msg.id}
+            key={msg._id || msg.id}
             message={msg}
             index={i}
-            isOwnMessage={msg.user === currentUser.username}
+            isOwnMessage={
+              // Check if msg.user is an object or string
+              msg.user?.username === currentUser.username ||
+              msg.user === currentUser.username
+            }
             onEditMessage={onEditMessage}
             onDeleteMessage={onDeleteMessage}
             onSendReaction={onSendReaction}
@@ -30,8 +33,14 @@ const MessageList = ({
           <div className="flex items-center text-sm text-gray-500 italic mb-4 ml-4">
             <div className="typing-dots flex space-x-1 mr-2">
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: "0.4s" }}
+              ></div>
             </div>
             {typingUser} is typing...
           </div>

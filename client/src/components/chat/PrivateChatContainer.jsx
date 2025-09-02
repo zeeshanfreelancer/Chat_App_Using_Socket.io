@@ -34,6 +34,32 @@ export default function PrivateChatContainer({ user, socket }) {
     };
   }, [socket, user]);
 
+  useEffect(() => {
+    if (!activeChat) return;
+
+    const fetchPrivate = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/messages/private/${user.username}/${activeChat}`
+        );
+        const data = await res.json();
+        const transformed = data.map(msg => ({
+          ...msg,
+          user: msg.user?.username || msg.user,
+          profilePic: msg.user?.profilePic,
+          bio: msg.user?.bio,
+        }));
+        setPrivateMessages(prev => ({ ...prev, [activeChat]: transformed }));
+      } catch (err) {
+        console.error("❌ Failed to fetch private messages", err);
+      }
+    };
+
+    fetchPrivate();
+  }, [activeChat]);
+
+
+
   const sendPrivateMessage = (recipient, message) => {
     if (!message.trim() || !recipient) return;
 

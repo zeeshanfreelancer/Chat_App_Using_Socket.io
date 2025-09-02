@@ -6,6 +6,7 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import Message from "./models/Message.js";
 import authRoutes from "./routes/auth.js";
+import messageRoutes from "./routes/message.js";
 import User from "./models/User.js";
 
 dotenv.config();
@@ -53,6 +54,8 @@ app.use("/api/auth", (req, res, next) => {
   });
   next();
 }, authRoutes);
+
+  app.use("/api/messages", messageRoutes);  // <-- register message routes
 
 io.on("connection", (socket) => {
   const username = socket.handshake.query.username || "Unknown";
@@ -116,6 +119,35 @@ io.on("connection", (socket) => {
   }
 });
 
+  // Get private messages between two users
+app.get("/api/messages/private/:user1/:user2", async (req, res) => {
+  try {
+    const { user1, user2 } = req.params;
+
+    // Find users
+    const u1 = await User.findOne({ username: user1 });
+    const u2 = await User.findOne({ username: user2 });
+
+    if (!u1 || !u2) return res.status(404).json({ message: "User not found" });
+
+    const messages = await Message.find({
+      type: "private",
+      $or: [
+        { user: u1._id, to: u2._id },
+        { user: u2._id, to: u1._id },
+      ],
+    })
+      .populate("user", "username profilePic")
+      .populate("to", "username")
+      .sort({ createdAt: 1 });
+
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: "❌ Failed to fetch private messages" });
+  }
+});
+
+
 
   // 🔹 Delete message
   socket.on("deleteMessage", async (id) => {
@@ -173,6 +205,20 @@ io.on("connection", (socket) => {
       console.error("❌ Chat message save failed:", error.message);
     }
   });
+
+  // Get all public messages
+  app.get("/api/messages/public", async (req, res) => {
+    try {
+      const messages = await Message.find({ type: "public" })
+        .populate("user", "username profilePic") // optional
+        .sort({ createdAt: 1 });
+
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "❌ Failed to fetch public messages" });
+    }
+  });
+
 
   // 🔹 Typing indicator
   socket.on("typing", (username) => {
