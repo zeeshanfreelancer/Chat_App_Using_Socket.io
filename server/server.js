@@ -176,7 +176,7 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
   // 🔹 Public chat messages
   socket.on("chatMessage", async (data) => {
     try {
-      const sender = await User.findOne({ username: data.username });
+      const sender = await User.findOne({ username: data.user });
       if (!sender) return;
 
       const newMessage = new Message({
