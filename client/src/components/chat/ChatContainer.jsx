@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import Header from "./Header";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
-import SidebarToggle from "./SidebarToggle";
 import PrivateChatWindow from "./PrivateChatWindow";
 
 const ChatContainer = ({ user, socket, onLogout }) => {

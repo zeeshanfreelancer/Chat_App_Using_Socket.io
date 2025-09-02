@@ -1,11 +1,21 @@
 import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  text: String,
-  reactions: [String],
+  // Sender
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+  // Recipient (null = public)
+  to: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
+  text: { type: String, required: true },
+
+  type: { type: String, enum: ["public", "private"], default: "public" },
+
+  reactions: { type: [String], default: [] },
+
+  edited: { type: Boolean, default: false },
+
   createdAt: { type: Date, default: Date.now },
-  edited: { type: Boolean, default: false }
 });
 
 export default mongoose.model("Message", messageSchema);

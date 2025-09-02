@@ -6,7 +6,7 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import Message from "./models/Message.js";
 import authRoutes from "./routes/auth.js";
-import User from "./models/User.js"; // <-- Import User model
+import User from "./models/User.js";
 
 dotenv.config();
 
@@ -27,25 +27,25 @@ const io = new Server(server, {
 });
 
 // Track online users
-let onlineUsers = {}; // { username: socketId }
+let onlineUsers = {}; 
 
-// ✅ Emit all registered users when Sidebar loads
+// Emit all registered users when Sidebar loads
 app.get("/api/users", async (req, res) => {
   try {
-    const users = await User.find({}, "username email"); // only return needed fields
+    const users = await User.find({}, "username email"); 
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: "❌ Failed to fetch users" });
   }
 });
 
-// ✅ Notify sockets when a new user signs up
+// Notify sockets when a new user signs up
 app.use("/api/auth", (req, res, next) => {
   res.once("finish", async () => {
     if (req.method === "POST" && res.statusCode === 201) {
       try {
         const users = await User.find({}, "username email");
-        io.emit("allUsers", users); // 🔹 broadcast updated user list
+        io.emit("allUsers", users); 
       } catch (err) {
         console.error("❌ Emit users failed:", err.message);
       }
@@ -68,12 +68,54 @@ io.on("connection", (socket) => {
   });
 
   // 🔹 Private message
-  socket.on("privateMessage", ({ to, from, text }) => {
+  socket.on("privateMessage", async ({ to, from, text }) => {
+    try {
+      // Save private message to DB
+    // Find sender and recipient in DB
+  const sender = await User.findOne({ username: from });
+  const recipient = await User.findOne({ username: to });
+
+  if (!sender || !recipient) {
+    console.error("❌ Sender or recipient not found");
+    return;
+  }
+
+  const newMessage = new Message({
+    user: sender._id,
+    to: recipient._id,
+    text,
+    type: "private",
+  });
+
+  await newMessage.save();
+
+  const messageData = {
+    _id: newMessage._id,
+    from,
+    to,
+    text,
+    type: "private",
+    time: new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+
+
+    // Send to recipient if online
     const targetSocket = onlineUsers[to];
     if (targetSocket) {
-      io.to(targetSocket).emit("privateMessage", { from, text });
+      io.to(targetSocket).emit("privateMessage", messageData);
     }
-  });
+
+    // Also send back to sender so they see it
+    socket.emit("privateMessage", messageData);
+
+  } catch (error) {
+    console.error("❌ Private message save failed:", error.message);
+  }
+});
+
 
   // 🔹 Delete message
   socket.on("deleteMessage", async (id) => {
@@ -102,10 +144,16 @@ io.on("connection", (socket) => {
   // 🔹 Public chat messages
   socket.on("chatMessage", async (data) => {
     try {
+      const sender = await User.findOne({ username: data.username });
+      if (!sender) return;
+
       const newMessage = new Message({
-        username: data.username,
+        user: sender._id,
         text: data.text,
+        type: "public",
       });
+      await newMessage.save();
+
       await newMessage.save();
 
       const messageData = {
