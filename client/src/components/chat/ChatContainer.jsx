@@ -8,7 +8,7 @@ const ChatContainer = ({ user, socket, onLogout }) => {
   const [messages, setMessages] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [activeChat, setActiveChat] = useState(null); // username of the private chat target
+  const [activeChat, setActiveChat] = useState(null); 
   const [privateMessages, setPrivateMessages] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
