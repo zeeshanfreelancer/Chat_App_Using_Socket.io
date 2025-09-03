@@ -13,11 +13,17 @@ export default function Login({ onLogin, setShowLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const user = await login(form);
-      onLogin(user);
-      toast.success("Login successful! 🎉");
+      const res = await login(form); 
+      if (res?.user) {
+        onLogin(res.user); // pass user to parent
+        toast.success(`Welcome back, ${res.user.username}! 🎉`);
+      } else {
+        toast.error("Login failed ❌");
+      }
     } catch (err) {
+      console.error(err);
       toast.error("Invalid email or password ❌");
     } finally {
       setLoading(false);
@@ -60,6 +66,7 @@ export default function Login({ onLogin, setShowLogin }) {
           {loading ? "Logging in..." : "Login"}
         </button>
       </form>
+
       <div className="mt-4 text-center">
         <span>Don't have an account? </span>
         <button

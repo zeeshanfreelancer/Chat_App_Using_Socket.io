@@ -11,10 +11,6 @@ const messageSchema = new mongoose.Schema({
 
   type: { type: String, enum: ["public", "private"], default: "public" },
 
-  reactions: { type: [String], default: [] },
-
-  edited: { type: Boolean, default: false },
-
   createdAt: { type: Date, default: Date.now },
 });
 

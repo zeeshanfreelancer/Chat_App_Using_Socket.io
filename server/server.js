@@ -22,18 +22,19 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"],
+    origin: ["http://localhost:5173"], // frontend origin
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true,
   },
 });
 
 // Track online users
-let onlineUsers = {}; 
+let onlineUsers = {};
 
-// Emit all registered users when Sidebar loads
+// 🔹 API Routes
 app.get("/api/users", async (req, res) => {
   try {
-    const users = await User.find({}, "username email"); 
+    const users = await User.find({}, "username email");
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: "❌ Failed to fetch users" });
@@ -41,90 +42,44 @@ app.get("/api/users", async (req, res) => {
 });
 
 // Notify sockets when a new user signs up
-app.use("/api/auth", (req, res, next) => {
-  res.once("finish", async () => {
-    if (req.method === "POST" && res.statusCode === 201) {
-      try {
-        const users = await User.find({}, "username email");
-        io.emit("allUsers", users); 
-      } catch (err) {
-        console.error("❌ Emit users failed:", err.message);
+app.use(
+  "/api/auth",
+  (req, res, next) => {
+    res.once("finish", async () => {
+      if (req.method === "POST" && res.statusCode === 201) {
+        try {
+          const users = await User.find({}, "username email");
+          io.emit("allUsers", users);
+        } catch (err) {
+          console.error("❌ Emit users failed:", err.message);
+        }
       }
-    }
-  });
-  next();
-}, authRoutes);
+    });
+    next();
+  },
+  authRoutes
+);
 
-  app.use("/api/messages", messageRoutes);  // <-- register message routes
+app.use("/api/messages", messageRoutes);
 
-io.on("connection", (socket) => {
-  const username = socket.handshake.query.username || "Unknown";
+// 🔹 Get all public messages
+app.get("/api/messages/public", async (req, res) => {
+  try {
+    const messages = await Message.find({ type: "public" })
+      .populate("user", "username profilePic")
+      .sort({ createdAt: 1 });
 
-  if (username !== "vite-hmr") {
-    console.log(`✅ ${username} connected`);
-  }
-
-  // 🔹 Register user when joining
-  socket.on("joinUser", (username) => {
-    onlineUsers[username] = socket.id;
-    io.emit("onlineUsers", Object.keys(onlineUsers));
-  });
-
-  // 🔹 Private message
-  socket.on("privateMessage", async ({ to, from, text }) => {
-    try {
-      // Save private message to DB
-    // Find sender and recipient in DB
-  const sender = await User.findOne({ username: from });
-  const recipient = await User.findOne({ username: to });
-
-  if (!sender || !recipient) {
-    console.error("❌ Sender or recipient not found");
-    return;
-  }
-
-  const newMessage = new Message({
-    user: sender._id,
-    to: recipient._id,
-    text,
-    type: "private",
-  });
-
-  await newMessage.save();
-
-  const messageData = {
-    _id: newMessage._id,
-    from,
-    to,
-    text,
-    type: "private",
-    time: new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  };
-
-
-    // Send to recipient if online
-    const targetSocket = onlineUsers[to];
-    if (targetSocket) {
-      io.to(targetSocket).emit("privateMessage", messageData);
-    }
-
-    // Also send back to sender so they see it
-    socket.emit("privateMessage", messageData);
-
+    res.json(messages);
   } catch (error) {
-    console.error("❌ Private message save failed:", error.message);
+    res.status(500).json({ message: "❌ Failed to fetch public messages" });
   }
 });
 
-  // Get private messages between two users
+// 🔹 Get private messages between two users
 app.get("/api/messages/private/:user1/:user2", async (req, res) => {
   try {
     const { user1, user2 } = req.params;
 
-    // Find users
     const u1 = await User.findOne({ username: user1 });
     const u2 = await User.findOne({ username: user2 });
 
@@ -137,7 +92,7 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
         { user: u2._id, to: u1._id },
       ],
     })
-      .populate("user", "username profilePic")
+      .populate("user", "username profilePic bio")
       .populate("to", "username")
       .sort({ createdAt: 1 });
 
@@ -147,33 +102,65 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
   }
 });
 
+// 🔹 Socket.IO events
+io.on("connection", (socket) => {
+  let username = socket.handshake.auth.username;
 
+  if (username !== "vite-hmr") {
+    console.log(`✅ ${username} connected`);
+    onlineUsers[username] = socket.id;
+    io.emit("onlineUsers", Object.keys(onlineUsers));
+  }
+  // Register user when joining
+  socket.on("joinUser", (username) => {
+    onlineUsers[username] = socket.id;
+    io.emit("onlineUsers", Object.keys(onlineUsers));
+  });
 
-  // 🔹 Delete message
-  socket.on("deleteMessage", async (id) => {
+  // Private message
+  socket.on("privateMessage", async ({ to, from, text }) => {
     try {
-      await Message.findByIdAndDelete(id);
-      io.emit("messageDeleted", id);
+      const sender = await User.findOne({ username: from });
+      const recipient = await User.findOne({ username: to });
+
+      if (!sender || !recipient) {
+        console.error("❌ Sender or recipient not found");
+        return;
+      }
+
+      const newMessage = new Message({
+        user: sender._id,
+        to: recipient._id,
+        text,
+        type: "private",
+      });
+
+      await newMessage.save();
+
+      const messageData = {
+        _id: newMessage._id,
+        from,
+        to,
+        text,
+        type: "private",
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      // Send to recipient if online
+      const targetSocket = onlineUsers[to];
+      if (targetSocket) {
+        io.to(targetSocket).emit("privateMessage", messageData);
+      }
+
     } catch (error) {
-      console.error("❌ Delete failed:", error.message);
+      console.error("❌ Private message save failed:", error.message);
     }
   });
 
-  // 🔹 Edit message
-  socket.on("editMessage", async ({ id, newText }) => {
-    try {
-      const msg = await Message.findByIdAndUpdate(
-        id,
-        { text: newText, edited: true },
-        { new: true }
-      );
-      io.emit("messageEdited", msg);
-    } catch (error) {
-      console.error("❌ Edit failed:", error.message);
-    }
-  });
-
-  // 🔹 Public chat messages
+  // Public chat message
   socket.on("chatMessage", async (data) => {
     try {
       const sender = await User.findOne({ username: data.user });
@@ -186,18 +173,14 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
       });
       await newMessage.save();
 
-      await newMessage.save();
-
       const messageData = {
         _id: newMessage._id,
-        username: data.username,
+        user: sender.username, 
         text: data.text,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        reactions: [],
-        edited: false,
       };
 
       io.emit("chatMessage", messageData);
@@ -206,21 +189,7 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
     }
   });
 
-  // Get all public messages
-  app.get("/api/messages/public", async (req, res) => {
-    try {
-      const messages = await Message.find({ type: "public" })
-        .populate("user", "username profilePic") // optional
-        .sort({ createdAt: 1 });
-
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ message: "❌ Failed to fetch public messages" });
-    }
-  });
-
-
-  // 🔹 Typing indicator
+  // Typing indicator
   socket.on("typing", (username) => {
     socket.broadcast.emit("typing", username);
   });
@@ -229,33 +198,13 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
     socket.broadcast.emit("stopTyping", username);
   });
 
-  // 🔹 Reactions
-  socket.on("reactMessage", async ({ id, reaction }) => {
-    try {
-      const msg = await Message.findById(id);
-      if (msg) {
-        msg.reactions.push(reaction);
-        await msg.save();
-        io.emit("reactMessage", { id, reactions: msg.reactions });
-      }
-    } catch (error) {
-      console.error("❌ Reaction failed:", error.message);
-    }
-  });
-
-  // 🔹 Disconnect
+  // Disconnect
   socket.on("disconnect", () => {
-    if (username !== "vite-hmr") {
+    if (username && username !== "vite-hmr") {
       console.log(`❌ ${username} disconnected`);
+      delete onlineUsers[username];
+      io.emit("onlineUsers", Object.keys(onlineUsers));
     }
-
-    // Remove from online users
-    for (let user in onlineUsers) {
-      if (onlineUsers[user] === socket.id) {
-        delete onlineUsers[user];
-      }
-    }
-    io.emit("onlineUsers", Object.keys(onlineUsers));
   });
 });
 

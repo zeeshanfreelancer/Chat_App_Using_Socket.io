@@ -19,12 +19,18 @@ export default function Register({ onRegister, setShowLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const user = await register(form);
-      onRegister(user);
-      toast.success("Registration successful! 🎉 You can now login.");
-      setShowLogin(true); // Redirect to login after success
+      const res = await register(form); 
+      if (res?.user) {
+        onRegister(res.user); // pass user to parent
+        toast.success(`Welcome, ${res.user.username}! 🎉 Registration successful.`);
+        setShowLogin(true); // redirect to login page
+      } else {
+        toast.error("Registration failed ❌");
+      }
     } catch (err) {
+      console.error(err);
       toast.error("Failed to register. Try again ❌");
     } finally {
       setLoading(false);
@@ -94,6 +100,7 @@ export default function Register({ onRegister, setShowLogin }) {
           {loading ? "Registering..." : "Register"}
         </button>
       </form>
+
       <div className="mt-4 text-center">
         <span>Already have an account? </span>
         <button
