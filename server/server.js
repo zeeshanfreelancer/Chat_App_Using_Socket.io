@@ -4,9 +4,10 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import connectDB from "./config/db.js";
-import Message from "./models/Message.js";
 import authRoutes from "./routes/auth.js";
 import messageRoutes from "./routes/message.js";
+import userRoutes from "./routes/user.js";
+import Message from "./models/Message.js";
 import User from "./models/User.js";
 
 dotenv.config();
@@ -18,12 +19,13 @@ app.use(express.json());
 // Connect MongoDB
 connectDB();
 
+// Create HTTP + Socket server
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173"], // frontend origin
-    methods: ["GET", "POST", "OPTIONS"],
+    origin: ["http://localhost:5173"],
+    methods: ["GET", "POST"],
     credentials: true,
   },
 });
@@ -31,49 +33,10 @@ const io = new Server(server, {
 // Track online users
 let onlineUsers = {};
 
-// 🔹 API Routes
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find({}, "username email");
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ message: "❌ Failed to fetch users" });
-  }
-});
-
-// Notify sockets when a new user signs up
-app.use(
-  "/api/auth",
-  (req, res, next) => {
-    res.once("finish", async () => {
-      if (req.method === "POST" && res.statusCode === 201) {
-        try {
-          const users = await User.find({}, "username email");
-          io.emit("allUsers", users);
-        } catch (err) {
-          console.error("❌ Emit users failed:", err.message);
-        }
-      }
-    });
-    next();
-  },
-  authRoutes
-);
-
+// 🔹 Routes
+app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
-
-// 🔹 Get all public messages
-app.get("/api/messages/public", async (req, res) => {
-  try {
-    const messages = await Message.find({ type: "public" })
-      .populate("user", "username profilePic")
-      .sort({ createdAt: 1 });
-
-    res.json(messages);
-  } catch (error) {
-    res.status(500).json({ message: "❌ Failed to fetch public messages" });
-  }
-});
+app.use("/api/users", userRoutes);
 
 // 🔹 Get private messages between two users
 app.get("/api/messages/private/:user1/:user2", async (req, res) => {
@@ -106,12 +69,13 @@ app.get("/api/messages/private/:user1/:user2", async (req, res) => {
 io.on("connection", (socket) => {
   let username = socket.handshake.auth.username;
 
-  if (username !== "vite-hmr") {
+  if (username && username !== "vite-hmr") {
     console.log(`✅ ${username} connected`);
     onlineUsers[username] = socket.id;
     io.emit("onlineUsers", Object.keys(onlineUsers));
   }
-  // Register user when joining
+
+  // Join user
   socket.on("joinUser", (username) => {
     onlineUsers[username] = socket.id;
     io.emit("onlineUsers", Object.keys(onlineUsers));
@@ -123,10 +87,7 @@ io.on("connection", (socket) => {
       const sender = await User.findOne({ username: from });
       const recipient = await User.findOne({ username: to });
 
-      if (!sender || !recipient) {
-        console.error("❌ Sender or recipient not found");
-        return;
-      }
+      if (!sender || !recipient) return;
 
       const newMessage = new Message({
         user: sender._id,
@@ -149,43 +110,12 @@ io.on("connection", (socket) => {
         }),
       };
 
-      // Send to recipient if online
       const targetSocket = onlineUsers[to];
       if (targetSocket) {
         io.to(targetSocket).emit("privateMessage", messageData);
       }
-
     } catch (error) {
       console.error("❌ Private message save failed:", error.message);
-    }
-  });
-
-  // Public chat message
-  socket.on("chatMessage", async (data) => {
-    try {
-      const sender = await User.findOne({ username: data.user });
-      if (!sender) return;
-
-      const newMessage = new Message({
-        user: sender._id,
-        text: data.text,
-        type: "public",
-      });
-      await newMessage.save();
-
-      const messageData = {
-        _id: newMessage._id,
-        user: sender.username, 
-        text: data.text,
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      };
-
-      io.emit("chatMessage", messageData);
-    } catch (error) {
-      console.error("❌ Chat message save failed:", error.message);
     }
   });
 

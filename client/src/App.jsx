@@ -5,12 +5,10 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AuthContainer from "./components/chat/AuthContainer";
 import ChatContainer from "./components/chat/ChatContainer";
-import PrivateChatContainer from "./components/chat/PrivateChatContainer";
 
 function App() {
   const [user, setUser] = useState(getCurrentUser());
   const [showLogin, setShowLogin] = useState(true);
-  const [showPrivateChat, setShowPrivateChat] = useState(false);
   const [socket, setSocket] = useState(null);
 
   // Initialize socket when user is available
@@ -50,20 +48,13 @@ function App() {
 
   return (
     <>
-      {showPrivateChat ? (
-        <PrivateChatContainer
-          user={user}
-          socket={socket}
-          onBack={() => setShowPrivateChat(false)}
-        />
-      ) : (
+
         <ChatContainer
           user={user}
           socket={socket}
           onLogout={handleLogout}
-          onPrivateChat={() => setShowPrivateChat(true)}
+
         />
-      )}
 
       <ToastContainer position="top-right" autoClose={3000} />
     </>

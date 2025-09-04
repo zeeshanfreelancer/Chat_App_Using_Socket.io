@@ -27,6 +27,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "Hey there! I am using the Chat App 🚀",
     },
+     // 🔹 Keep track of people you’ve chatted with
+    chats: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );

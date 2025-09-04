@@ -6,20 +6,20 @@ const AuthContainer = ({ showLogin, setShowLogin, setUser }) => {
   return showLogin ? (
     <Login
       onLogin={(user) => {
-        setUser(user);
+        setUser(user); 
         setShowLogin(true);
       }}
       setShowLogin={setShowLogin}
     />
   ) : (
     <Register
-      onRegister={(user) => {
-        setUser(user);
-        setShowLogin(true);
+      onRegister={() => {
+        setShowLogin(true); // go to login page
       }}
       setShowLogin={setShowLogin}
     />
   );
 };
+
 
 export default AuthContainer;

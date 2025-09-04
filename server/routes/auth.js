@@ -12,7 +12,8 @@ router.post("/register", async (req, res) => {
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
+    if (existingUser)
+      return res.status(400).json({ message: "User already exists" });
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -28,15 +29,22 @@ router.post("/register", async (req, res) => {
 
     await newUser.save();
 
-    res.status(201).json({ message: "User registered successfully" });
-  } catch (err) {
-    console.error("Register error:", err); // <-- Add this for server logs
-    res.status(500).json({ 
-      error: err.message, 
-      stack: err.stack // <-- Add stack trace for detailed error
+    res.status(201).json({
+      message: "User registered successfully",
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        bio: newUser.bio,
+        profilePic: newUser.profilePic,
+      },
     });
+  } catch (err) {
+    console.error("Register error:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
+
 
 // Login
 router.post("/login", async (req, res) => {
